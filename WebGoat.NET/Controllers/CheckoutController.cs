@@ -73,7 +73,7 @@ namespace WebGoatCore.Controllers
                 _model.Country = customer.Country ?? string.Empty;
             }
         }
-
+/*
         [HttpPost]
         public IActionResult Checkout(CheckoutViewModel model)
         {
@@ -156,6 +156,64 @@ namespace WebGoatCore.Controllers
             HttpContext.Session.SetInt32("OrderId", orderId);
             HttpContext.Session.Remove("Cart");
             return RedirectToAction("Receipt");
+        }
+*/
+
+        [HttpPost]
+        [ValidateAntiForgeryToken] // Beskyttelse mod CSRF ved pengetransaktioner (TB1)
+        public IActionResult Checkout(CheckoutViewModel model)
+        {
+            // -------------------------------------------------------------
+            // 1. AC-09: TB1 Validering af Modtagernavn (Afviser SQL-injections)
+            // -------------------------------------------------------------
+            if (!ShipName.TryParse(model.ShipTarget, out var validatedShipName, out var shipNameError))
+            {
+                ModelState.AddModelError(nameof(model.ShipTarget), shipNameError);
+            }
+
+            // -------------------------------------------------------------
+            // 2. AC-10: TB1 Validering af Kreditkort (Luhn & Formatkontrol)
+            // -------------------------------------------------------------
+            if (!CreditCardNumber.TryParse(model.CreditCardNumber, out var validatedCard, out var cardError))
+            {
+                ModelState.AddModelError(nameof(model.CreditCardNumber), cardError);
+            }
+
+            // Hvis enten modtagernavn eller kort er ugyldigt -> Fail-Fast
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            // -------------------------------------------------------------
+            // 3. Opret Order (Bemærk: Kortnummer gemmes ALDRIG i SQLite jf. PCI-DSS!)
+            // -------------------------------------------------------------
+            var order = new Order
+            {
+                ShipName = validatedShipName, // Sikret via domæneprimitiv
+                ShipAddress = model.Address,
+                ShipCity = model.City,
+                ShipRegion = model.Region,
+                ShipPostalCode = model.PostalCode,
+                ShipCountry = model.Country,
+                ShipVia = 1,
+                OrderDate = DateTime.Now
+            };
+
+            // Ordren persisteres sikkert via parametriseret SQL i OrderRepository (TB2)
+            int orderId = _orderRepository.CreateOrder(order);
+
+            // -------------------------------------------------------------
+            // 4. AC-10 Betalingsgodkendelse (Simulation af ekstern Gateway):
+            // -------------------------------------------------------------
+            // Her overdrages validatedCard til betalingsgatewayen.
+            // Vi logger udelukkende den maskerede værdi (f.eks. ************1111)
+            // Kortdata i RAM kasseres hermed sikkert.
+            
+            // Ryd session-kurven efter succesfuld betaling
+            HttpContext.Session.Remove("Cart");
+
+            return RedirectToAction("Receipt", new { id = orderId });
         }
 
         public IActionResult Receipt(int? id)

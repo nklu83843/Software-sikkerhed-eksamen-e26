@@ -14,6 +14,12 @@ using System.Reflection;
 using Microsoft.Extensions.FileProviders;
 using WebGoatCore.Controllers;
 using WebGoatCore.Exceptions;
+using Microsoft.AspNetCore.Builder; 
+using Microsoft.AspNetCore.Hosting; 
+using Microsoft.Extensions.Configuration; 
+using Microsoft.Extensions.DependencyInjection; 
+using Microsoft.Extensions.Hosting; 
+using Microsoft.Extensions.Logging;
 
 namespace WebGoatCore
 {
@@ -123,7 +129,7 @@ namespace WebGoatCore
             services.AddScoped<OrderRepository>();
             services.AddScoped<CategoryRepository>();
         }
-
+/*
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
            
@@ -147,7 +153,50 @@ namespace WebGoatCore
                     pattern: "{controller=Home}/{action=Index}");
             });
         }
-        
+*/
+
+        /*
+        Udbedring af AC-09 (Del 3): Håndhævelse af Fail Secure og Global Fejlhåndtering
+
+        Uhåndterede undtagelser i WebGoat.NET udstiller fulde stack traces, interne stier og kildekodelinjer i browseren. 
+        Dette overtræder det grundlæggende princip om Fail Secure og fører til Fail Insecurely
+        */
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILogger<Startup> logger)
+        {
+            if (env.IsDevelopment())
+            {
+                // Udviklervisning: Kun tilladt i isoleret lokalt miljø
+                app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                // PRODUKTIONSSIKRING (Fail Secure):
+                // Fanger alle ubehandlede tekniske undtagelser og omdirigerer til StatusCodeController
+                app.UseExceptionHandler("/StatusCode?code=500");
+
+                // HSTS (HTTP Strict Transport Security) til sikring af transportlaget
+                app.UseHsts();
+            }
+
+            // Central håndtering af HTTP statuskoder (f.eks. 404 Not Found og 403 Forbidden)
+            app.UseStatusCodePagesWithReExecute("/StatusCode?code={0}");
+
+            app.UseHttpsRedirection();
+            app.UseStaticFiles();
+            app.UseRouting();
+
+            app.UseAuthentication();
+            app.UseAuthorization();
+
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllerRoute(
+                    name: "default",
+                    pattern: "{controller=Home}/{action=Index}/{id?}");
+            });
+        }
+
+
         public int startupNotUsed(int a, int b) // Function added to generate same FA Violation
         {
             var c = 1;

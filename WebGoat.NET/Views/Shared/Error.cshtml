@@ -1,14 +1,16 @@
-﻿@model ErrorViewModel
-
+﻿@model WebGoatCore.ViewModels.ErrorViewModel
 @{
-    ViewData["Title"] = "Error";
+    ViewData["Title"] = "Fejl";
 }
 
-<h1 class="text-danger">Error.</h1>
-<h2 class="text-danger">An error occurred on our server. We're sorry :(</h2>
-<br>
-<h4>Request id: @Model.RequestId</h4>
-<h4>Path: @Model.ExceptionInfo.Path</h4>
-<h4>Exception: @Model.ExceptionInfo.Error.Message</h4>
-<h4>Stack trace:</h4>
-<span>@Model.ExceptionInfo.Error.StackTrace</span>
+<h1 class="text-danger">Der opstod en fejl</h1>
+<p class="lead">Der opstod en uventet fejl under behandlingen af din anmodning.</p>
+
+@if (Model.ShowRequestId)
+{
+    <p>
+        <small class="text-muted">
+            <strong>Support-ID:</strong> <code>@Model.RequestId</code>
+        </small>
+    </p>
+}

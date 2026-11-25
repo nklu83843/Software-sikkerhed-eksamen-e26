@@ -7,6 +7,16 @@ namespace WebGoatCore.ViewModels
 {
     public class CheckoutViewModel
     {
+        // =========================================================
+        // AC-10: Betalingsfelter ved Tillidsgrænse 1 (TB1)
+        // =========================================================
+        [Display(Name = "Credit Card Number")]
+        [Required(ErrorMessage = "Kreditkortnummer skal angives.")]
+        public string CreditCardNumber { get; set; }
+
+        [Display(Name = "Expiration Date (MM/YY)")]
+        public string ExpirationDate { get; set; }
+
         [Display(Name = "Name to ship to")]
         [Required(ErrorMessage = "Please enter the name")]
         public string ShipTarget { get; set; }

@@ -16,7 +16,8 @@ namespace WebGoatCore.Models
         public DateTime? ShippedDate { get; set; }
         public int ShipVia { get; set; }
         public decimal Freight { get; set; }
-        public string? ShipName { get; set; }
+        // public string? ShipName { get; set; } // FØR (Sårbar over for Primitive Obsession):
+        public ShipName ShipName { get; set; } // EFTER (Stærk typning og Validity by Existence):
         public string? ShipAddress { get; set; }
         public string? ShipCity { get; set; }
         public string? ShipRegion { get; set; }
