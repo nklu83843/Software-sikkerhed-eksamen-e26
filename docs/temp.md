@@ -1041,3 +1041,108 @@ Vælg **Løsning 1** for at få en ren build lige nu (eller **Løsning 2** for d
 dotnet build
 ```
 Så kompilerer hele projektet fejlfrit!
+
+
+
+
+
+---
+
+Her fangede testsuiten to helt fantastiske og lærerige detaljer i henholdsvis matematikken og exception-hierarkiet:
+
+---
+
+### Fejl 1: `"1234567812345670"` – Den matematiske sammentræf!
+I testen forventede du en `ArgumentException`, men xUnit melder:  
+**`Assert.Throws() Failure: No exception was thrown`**
+
+Hvorfor kastede koden ingen fejl? Fordi det tilfældige testnummer `"1234567812345670"` rent faktisk er et **100 % matematisk gyldigt Luhn-nummer!**
+
+Prøv at se udregningen af Luhn Modulus 10 (hvert andet ciffer fra højre fordobles):
+* 0 (ikke fordoblet) = **0**
+* 7 × 2 = 14 \\(\rightarrow 1+4\\) = **5**
+* 6 (ikke fordoblet) = **6**
+* 5 × 2 = 10 \\(\rightarrow 1+0\\) = **1**
+* 4 (ikke fordoblet) = **4**
+* 3 × 2 = **6**
+* 2 (ikke fordoblet) = **2**
+* 1 × 2 = **2**
+* 8 (ikke fordoblet) = **8**
+* 7 × 2 = 14 \\(\rightarrow 1+4\\) = **5**
+* 6 (ikke fordoblet) = **6**
+* 5 × 2 = 10 \\(\rightarrow 1+0\\) = **1**
+* 4 (ikke fordoblet) = **4**
+* 3 × 2 = **6**
+* 2 (ikke fordoblet) = **2**
+* 1 × 2 = **2**
+
+Lægger vi tallene sammen:  
+\\(0 + 5 + 6 + 1 + 4 + 6 + 2 + 2 + 8 + 5 + 6 + 1 + 4 + 6 + 2 + 2 = \mathbf{60}\\)
+
+Da 60 er deleligt med 10 (\\(60 \pmod{10} = 0\\)), godkender din `PassesLuhnCheck`-metode kortet som fuldstændig gyldigt! Koden opførte sig altså matematisk korrekt – nummeret var bare ikke ugyldigt, som du troede.
+
+**Løsning:** Ændr det sidste ciffer til et tal, der *ikke* går op i 10, f.eks. `"1234567812345671"` (summen bliver 61).
+
+---
+
+### Fejl 2: `"123456789"` og `ArgumentOutOfRangeException`
+Testen fejler i metoden `Constructor_WithOutOfRangeLength_ThrowsArgumentOutOfRangeException`.
+
+Her er fejlen opstået på grund af rækkefølgen af kontrollerne i `CreditCardNumber.cs`:
+
+```csharp
+// 1. Tjekker regex ({13,23} tegn)
+if (!FormatRegex.IsMatch(rawInput))
+    throw new ArgumentException("Ugyldigt format for kreditkortnummer.", nameof(rawInput));
+
+// 2. Tjekker længde på de rene cifre (13 til 19 cifre)
+if (digitsOnly.Length < 13 || digitsOnly.Length > 19)
+    throw new ArgumentOutOfRangeException(nameof(rawInput), "Kortnummer skal indeholde mellem 13 og 19 cifre.");
+```
+
+Når du sender `"123456789"` (9 tegn) ind:
+1. Den rammer **FormatRegex først**, fordi regex kræver mindst 13 tegn (`{13,23}`).
+2. Derfor kaster den en almindelig **`ArgumentException`** og når aldrig ned til `ArgumentOutOfRangeException` på trin 2!
+3. I xUnit forlanger `Assert.Throws<ArgumentOutOfRangeException>` specifikt den afledte undertype. Da den fik den overordnede `ArgumentException`, fejler testen.
+
+---
+
+### Sådan retter du testene i `CreditCardNumberTests.cs`
+
+Åbn **`WebGoat.NET.Tests/CreditCardNumberTests.cs`** og opdater de to metoder:
+
+#### 1. Ret det tilfældige kortnummer, så det beviseligt fejler Luhn:
+```csharp
+[Theory]
+[InlineData("4532015112830367")] // Forkert kontrolciffer (Fejler Luhn Mod 10)
+[InlineData("1234567812345671")] // RETTET: Sum = 61 (Fejler garanteret Luhn!)
+[InlineData("453201511283A366")] // Indeholder bogstaver
+[InlineData("453201511283'366")] // Indeholder SQL injection-tegn
+public void Constructor_WithInvalidLuhnOrCharacters_ThrowsArgumentException(string invalidCard)
+{
+    Assert.Throws<ArgumentException>(() => new CreditCardNumber(invalidCard));
+}
+```
+
+#### 2. Brug `Assert.ThrowsAny<ArgumentException>` til længdekontrollen:
+Da både for korte strenge (der afvises af regex som `ArgumentException`) og for lange strenge (der afvises som `ArgumentOutOfRangeException`) begge er varianter af `ArgumentException`, bruger du **`Assert.ThrowsAny`**:
+
+```csharp
+[Theory]
+[InlineData("123456789")]                // For kort (< 13 tegn)
+[InlineData("123456789012345678901234")] // For langt (> 19/23 tegn)
+public void Constructor_WithOutOfRangeLength_ThrowsArgumentException(string outOfRangeCard)
+{
+    // ThrowsAny accepterer både ArgumentException og den nedarvede ArgumentOutOfRangeException
+    Assert.ThrowsAny<ArgumentException>(() => new CreditCardNumber(outOfRangeCard));
+}
+```
+
+---
+
+Kør nu:
+```bash
+dotnet test
+```
+
+Nu stemmer matematikkens verden, C#'s undtagelseshierarki og xUnits forventninger 100 % overens, og hele testsuiten lyser **grønt**!
